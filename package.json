@@ -1,6 +1,6 @@
 {
   "_from": "node-red-contrib-storage-s3",
-  "_id": "node-red-contrib-storage-s3@0.0.4",
+  "_id": "node-red-contrib-storage-s3@0.0.5",
   "_inBundle": false,
   "_integrity": "sha1-LtSjAU8NZhduIKhvqlSQFWWMCjw=",
   "_location": "/node-red-contrib-storage-s3",
@@ -29,7 +29,7 @@
   },
   "bundleDependencies": false,
   "dependencies": {
-    "aws-sdk": "2.4.x",
+    "aws-sdk": "^2.430.0",
     "when": "3.7.x"
   },
   "deprecated": false,
@@ -46,5 +46,5 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "0.0.4"
+  "version": "0.0.5"
 }

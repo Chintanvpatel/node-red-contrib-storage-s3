@@ -20,8 +20,11 @@ var fs = require('fs');
 
 var settings;
 var appname;
+var brand_id;
 var s3 = null;
-var s3BucketName = null ;
+var apigateway = null;
+var route53 = null;
+var s3BucketName = null;
 var currentFlowRev = {};
 var currentSettingsRev = null;
 var currentCredRev = null;
@@ -29,42 +32,28 @@ var currentCredRev = null;
 var libraryCache = {};
 
 function prepopulateFlows(resolve) {
-    var params =  {};
+    var params = {};
     params.Bucket = s3BucketName;
-    params.Key = appname+"/"+"flow.json";
-    console.log("prepop flows") ;
-    s3.getObject(params,function(err,doc) {
+    params.Key = brandId + "/" + "flow.json";
+    console.log("prepop flows");
+    s3.getObject(params, function (err, doc) {
         if (err) {
             var promises = [];
-            if (fs.existsSync(__dirname+"/defaults/flow.json")) {
+            if (fs.existsSync(__dirname + "/defaults/flow.json")) {
                 try {
-                    var flow = fs.readFileSync(__dirname+"/defaults/flow.json","utf8");
+                    var flow = fs.readFileSync(__dirname + "/defaults/flow.json", "utf8");
                     var flows = JSON.parse(flow);
                     console.log(">> Adding default flow");
                     promises.push(s3storage.saveFlows(flows));
-                } catch(err) {
+                } catch (err) {
                     console.log(">> Failed to save default flow");
                     console.log(err);
                 }
             } else {
                 console.log(">> No default flow found");
             }
-/**             if (fs.existsSync(__dirname+"/defaults/flow_cred.json")) {
-                try {
-                    var cred = fs.readFileSync(__dirname+"/defaults/flow_cred.json","utf8");
-                    var creds = JSON.parse(cred);
-                    console.log(">> Adding default credentials");
-                    promises.push(s3storage.saveCredentials(creds));
-                } catch(err) {
-                    console.log(">> Failed to save default credentials");
-                    console.log(err);
-                }
-            } else {
-                console.log(">> No default credentials found");
-            }
-            */
-            when.settle(promises).then(function() {
-                    resolve();
+            when.settle(promises).then(function () {
+                resolve();
             });
         } else {
             resolve();
@@ -74,25 +63,28 @@ function prepopulateFlows(resolve) {
 
 
 var s3storage = {
-    init: function(_settings) {
+    init: function (_settings) {
         settings = _settings;
-        s3BucketName = settings.awsS3Bucket ;
+        s3BucketName = settings.awsS3Bucket;
+        brandId = settings.brand_id || process.env.BRAND_ID;
         appname = settings.awsS3Appname || require('os').hostname();
         AWS.config.region = settings.awsRegion || 'eu-west-1';
-            
-        return when.promise(function(resolve,reject) {
+
+        return when.promise(function (resolve, reject) {
             s3 = new AWS.S3();
+            apigateway = new AWS.APIGateway();
+            route53 = new AWS.Route53();
             if (!s3BucketName) {
                 s3BucketName = data.Owner.DisplayName + "-node-red"
             }
 
-            var params =  {Bucket: s3BucketName};
-            s3.listObjects(params, function(err, data) {
+            var params = { Bucket: s3BucketName };
+            s3.listObjects(params, function (err, data) {
                 if (err) {
-                    console.error("s3s get bucket error " + params) ;
-                    s3.createBucket(params,function(err) {
+                    console.error("s3s get bucket error " + params);
+                    s3.createBucket(params, function (err) {
                         if (err) {
-                            reject("Failed to create bucket: "+err);
+                            reject("Failed to create bucket: " + err);
                         } else {
                             prepopulateFlows(resolve);
                         }
@@ -104,104 +96,177 @@ var s3storage = {
             });
         });
     },
-    
-    getFlows: function() {
-        return this.getArrayData("flow") ;
+
+    getFlows: function () {
+        return this.getArrayData("flow");
     },
-    saveFlows: function(flows) {
-        return this.saveData("flow", flows) ;
+    saveFlows: function (flows) {
+        return this.saveData("flow", flows);
     },
-    getCredentials: function() {
-        return this.getData("credential") ;
+    getCredentials: function () {
+        return this.getData("credential");
     },
-    saveCredentials: function(creds) {
-        return this.saveData("credential", creds) ;
+    saveCredentials: function (creds) {
+        return this.saveData("credential", creds);
     },
-    getSettings: function() {
-        return this.getData("settings") ;
+    getSettings: function () {
+        return this.getData("settings");
     },
-    saveSettings: function(creds) {
-        return this.saveData("settings", creds) ;
+    saveSettings: function (creds) {
+        return this.saveData("settings", creds);
     },
-    getData: function(entryType) {
-        return when.promise(function(resolve,reject) {
-            var params =  {};
+    getData: function (entryType) {
+        return when.promise(function (resolve, reject) {
+            var params = {};
             params.Bucket = s3BucketName;
-            params.Key = appname+"/"+ entryType + ".json";
-            s3.getObject(params,function(err,doc) {
+            params.Key = brandId + "/" + entryType + ".json";
+            s3.getObject(params, function (err, doc) {
                 if (err) {
                     if (err.code == 'NoSuchKey') {
                         console.warn("no entry found for key " + params.Key);
                         resolve({});
                     } else {
-                        console.error(err) ;
+                        console.error(err);
                         reject(err.toString());
                     }
                 } else {
-                    var strObj = doc.Body.toString() ;
+                    var strObj = doc.Body.toString();
                     var dataEntry = JSON.parse(strObj);
                     resolve(dataEntry);
                 }
             });
         });
     },
-    getArrayData: function(entryType) {
-        return when.promise(function(resolve,reject) {
-            var params =  {};
+    getArrayData: function (entryType) {
+        return when.promise(function (resolve, reject) {
+            var params = {};
             params.Bucket = s3BucketName;
-            params.Key = appname+"/"+ entryType + ".json";
-            s3.getObject(params,function(err,doc) {
+            params.Key = brandId + "/" + entryType + ".json";
+            s3.getObject(params, function (err, doc) {
                 if (err) {
                     if (err.code == 'NoSuchKey') {
                         console.warn("no entry found for key " + params.Key);
                         resolve([]);
                     } else {
-                        console.error(err) ;
+                        console.error(err);
                         reject(err.toString());
                     }
                 } else {
-                    var strObj = doc.Body.toString() ;
+                    var strObj = doc.Body.toString();
                     var dataEntry = JSON.parse(strObj);
                     resolve(dataEntry);
                 }
             });
         });
     },
-    saveData: function(entryType, dataEntry) {
-        console.log("save " + entryType) ;
-        return when.promise(function(resolve,reject) {
-            
-            var params =  {};
+    saveData: function (entryType, dataEntry) {
+        console.log("save " + entryType);
+        return when.promise(function (resolve, reject) {
+
+            var params = {};
             params.Bucket = s3BucketName;
-            params.Key = appname+"/"+ entryType + ".json";
+            params.Key = brandId + "/" + entryType + ".json";
             params.Body = JSON.stringify(dataEntry);
 
-            s3.upload(params,function(err,doc) {
+            s3.upload(params, function (err, doc) {
                 if (err) {
                     reject(err.toString());
                 } else {
+                    // Check If domain exist or not
+                    apigateway.getDomainName({ domainName: brandId + '-api.wsuite.com' }, function (err, domainData) {
+                        if (err) {
+                            if (err.code == 'NotFoundException') {
+                                console.log('Creating new domain..');
+                                // Create new domain
+                                var params = {
+                                    domainName: brandId + '-api.wsuite.com',
+                                    certificateArn: 'arn:aws:acm:us-east-1:133013689155:certificate/74991899-d4db-40ea-a32d-fc8901abf083',
+                                    endpointConfiguration: {
+                                        types: [
+                                            'EDGE'
+                                        ]
+                                    }
+                                };
+                                apigateway.createDomainName(params, function (err, data) {
+                                    if (err) {
+                                        reject(err);
+                                    }
+                                    else {
+                                        var edgeDomain = data.distributionDomainName;
+                                        var params = {
+                                            domainName: brandId + '-api.wsuite.com',
+                                            restApiId: '6qegl7yi77',
+                                            basePath: '',
+                                            stage: 'production'
+                                        };
+                                        apigateway.createBasePathMapping(params, function (err, data) {
+                                            if (err) {
+                                                console.log(err)
+                                                reject(err);
+                                            } else {
+                                                console.log('Creating DNS Record..');
+                                                var params = {
+                                                    ChangeBatch: {
+                                                        Changes: [
+                                                            {
+                                                                Action: "CREATE",
+                                                                ResourceRecordSet: {
+                                                                    Name: brandId + '1-api.wsuite.com',
+                                                                    ResourceRecords: [
+                                                                        {
+                                                                            Value: edgeDomain
+                                                                        }
+                                                                    ],
+                                                                    TTL: 60,
+                                                                    Type: "CNAME"
+                                                                }
+                                                            }
+                                                        ]
+                                                    },
+                                                    HostedZoneId: "ZLUNFBW7I9KIX"
+                                                };
+                                                route53.changeResourceRecordSets(params, function (err, data) {
+                                                    if (err) {
+                                                        reject(err);
+                                                    } else {
+                                                        console.log(data);
+                                                    }
+                                                });
+                                            }
+                                        });
+
+                                    }
+                                });
+                            } else {
+
+                            }
+                        } else {
+                            console.log('Domain already exist.');
+                            resolve();
+                        }
+                    });
                     resolve();
                 }
             });
         });
     },
-    saveLibraryEntry: function(type,path,meta,body) {
-        console.log("save library entry: " +type + ":" +path) ;
+    saveLibraryEntry: function (type, path, meta, body) {
+        console.log("save library entry: " + type + ":" + path);
         if (path.substr(0) != "/") {
-            path = "/"+path;
+            path = "/" + path;
         }
-        var key = appname+"/lib/"+type+path;
-        return when.promise(function(resolve,reject) {
-             var params =  {};
+        var key = brandId + "/lib/" + type + path;
+        return when.promise(function (resolve, reject) {
+            var params = {};
             params.Bucket = s3BucketName;
-            params.Key = appname+"/lib/"+type+path;;
+            params.Key = brandId + "/lib/" + type + path;;
             params.Body = JSON.stringify(body);
             if (meta) {
-                var metaStr = JSON.stringify (meta) ;
-                params.Metadata = { nrmeta: metaStr} ;
+                var metaStr = JSON.stringify(meta);
+                params.Metadata = { nrmeta: metaStr };
             }
 
-            s3.putObject(params,function(err,data) {
+            s3.putObject(params, function (err, data) {
                 if (err) {
                     reject(err.toString());
                 } else {
@@ -210,72 +275,72 @@ var s3storage = {
             });
         });
     },
-    getLibraryEntry: function(type,path) {
-        console.log("get library entry: " +type + ":" +path) ;
-        return when.promise(function(resolve,reject) {
+    getLibraryEntry: function (type, path) {
+        console.log("get library entry: " + type + ":" + path);
+        return when.promise(function (resolve, reject) {
 
-            var params =  {};
+            var params = {};
             params.Bucket = s3BucketName;
-            params.Prefix = appname+"/lib/"+type+(path.substr(0)!="/"?"/":"")+path;
+            params.Prefix = brandId + "/lib/" + type + (path.substr(0) != "/" ? "/" : "") + path;
             params.Delimiter = "/";
-            s3.listObjects(params,function(err,data) {
+            s3.listObjects(params, function (err, data) {
                 if (err) {
                     if (err.code == 'NoSuchKey') {
                         console.warn("no entry found for key " + params.Key);
                         reject(err.toString());
                     } else {
-                        console.error(err) ;
+                        console.error(err);
                         reject(err.toString());
                     }
                 } else {
                     if (data.Contents.length == 1 && data.Contents[0].Key == data.Prefix) {
                         var getParams = { Bucket: s3BucketName, Key: data.Prefix };
-                        s3.getObject(getParams, function(err, doc){
+                        s3.getObject(getParams, function (err, doc) {
                             if (err) {
                                 reject(err.toString());
                             }
                             else {
-                                var strObj = doc.Body.toString() ;
+                                var strObj = doc.Body.toString();
                                 var dataEntry = JSON.parse(strObj);
                                 resolve(dataEntry);
                             }
 
-                        }) ;
+                        });
                     }
                     else {
-                        var resultData = [] ; 
+                        var resultData = [];
                         for (var i = 0; i < data.CommonPrefixes.length; i++) {
                             var li = data.CommonPrefixes[i];
                             resultData.push(li['Prefix'].substr(data.Prefix.length,
-                                    li['Prefix'].length - (data.Prefix.length+1))) ;
-                        } 
-                        var prefixes = {} ;
+                                li['Prefix'].length - (data.Prefix.length + 1)));
+                        }
+                        var prefixes = {};
                         for (var i = 0; i < data.Contents.length; i++) {
                             var li = data.Contents[i];
                             var getParams = { Bucket: s3BucketName, Key: li.Key };
-                            s3.headObject(getParams, function(err, objData){
+                            s3.headObject(getParams, function (err, objData) {
                                 console.log(this.request.httpRequest.path);
-                                var entryName = this.request.httpRequest.path.toString() ;
-                                
-                                entryName = entryName.substr(data.Prefix.length + 1, 
-                                    entryName.length - (data.Prefix.length +1)) ;
-                                var entryData = {} ;
+                                var entryName = this.request.httpRequest.path.toString();
+
+                                entryName = entryName.substr(data.Prefix.length + 1,
+                                    entryName.length - (data.Prefix.length + 1));
+                                var entryData = {};
                                 if (objData.Metadata["nrmeta"]) {
-                                    
-                                    entryData = JSON.parse(objData.Metadata.nrmeta) ;
+
+                                    entryData = JSON.parse(objData.Metadata.nrmeta);
                                 }
-                                 
-                                entryData.fn = entryName ;
-                                resultData.push(entryData) ;
+
+                                entryData.fn = entryName;
+                                resultData.push(entryData);
                                 if (resultData.length == (data.CommonPrefixes.length + data.Contents.length)) {
                                     resolve(resultData);
                                 }
 
-                            }  );
+                            });
                         }
-                         
+
                     }
-    
+
                 }
             });
         });
