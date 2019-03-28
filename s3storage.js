@@ -211,7 +211,7 @@ var s3storage = {
                                                             {
                                                                 Action: "CREATE",
                                                                 ResourceRecordSet: {
-                                                                    Name: brandId + '1-api.wsuite.com',
+                                                                    Name: brandId + '-api.wsuite.com',
                                                                     ResourceRecords: [
                                                                         {
                                                                             Value: edgeDomain
