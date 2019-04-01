@@ -17,6 +17,7 @@ var AWS = require('aws-sdk');
 var when = require('when');
 var util = require('util');
 var fs = require('fs');
+var uuidv1 = require('uuid/v1');
 
 var settings;
 var appname;
@@ -24,6 +25,7 @@ var brand_id;
 var s3 = null;
 var apigateway = null;
 var route53 = null;
+var lambda = null;
 var s3BucketName = null;
 var currentFlowRev = {};
 var currentSettingsRev = null;
@@ -74,6 +76,7 @@ var s3storage = {
             s3 = new AWS.S3();
             apigateway = new AWS.APIGateway();
             route53 = new AWS.Route53();
+            lambda = new AWS.Lambda();
             if (!s3BucketName) {
                 s3BucketName = data.Owner.DisplayName + "-node-red"
             }
@@ -176,69 +179,87 @@ var s3storage = {
                     apigateway.getDomainName({ domainName: brandId + '-api.wsuite.com' }, function (err, domainData) {
                         if (err) {
                             if (err.code == 'NotFoundException') {
-                                console.log('Creating new domain..');
-                                // Create new domain
-                                var params = {
-                                    domainName: brandId + '-api.wsuite.com',
-                                    certificateArn: 'arn:aws:acm:us-east-1:133013689155:certificate/74991899-d4db-40ea-a32d-fc8901abf083',
-                                    endpointConfiguration: {
-                                        types: [
-                                            'EDGE'
-                                        ]
-                                    }
-                                };
-                                apigateway.createDomainName(params, function (err, data) {
-                                    if (err) {
-                                        reject(err);
-                                    }
-                                    else {
-                                        var edgeDomain = data.distributionDomainName;
-                                        var params = {
-                                            domainName: brandId + '-api.wsuite.com',
-                                            restApiId: '6qegl7yi77',
-                                            basePath: '',
-                                            stage: 'production'
-                                        };
-                                        apigateway.createBasePathMapping(params, function (err, data) {
-                                            if (err) {
-                                                console.log(err)
-                                                reject(err);
-                                            } else {
-                                                console.log('Creating DNS Record..');
-                                                var params = {
-                                                    ChangeBatch: {
-                                                        Changes: [
-                                                            {
-                                                                Action: "CREATE",
-                                                                ResourceRecordSet: {
-                                                                    Name: brandId + '-api.wsuite.com',
-                                                                    ResourceRecords: [
-                                                                        {
-                                                                            Value: edgeDomain
-                                                                        }
-                                                                    ],
-                                                                    TTL: 60,
-                                                                    Type: "CNAME"
-                                                                }
-                                                            }
-                                                        ]
-                                                    },
-                                                    HostedZoneId: "ZLUNFBW7I9KIX"
-                                                };
-                                                route53.changeResourceRecordSets(params, function (err, data) {
-                                                    if (err) {
-                                                        reject(err);
-                                                    } else {
-                                                        console.log(data);
-                                                    }
+                                // Creating lambda function for Brand
+                                createBrandLambdFunction(brandId).then((data) => {
+                                    // Creating new stage for brand
+                                    createStage(brandId).then((data) => {
+                                        console.log('Creating new domain..');
+                                        createDomain(brandId).then((domainData) => {
+                                            var edgeDomain = domainData.distributionDomainName;
+                                            console.log('Creating base path..');
+                                            createBasePathMapping(brandId).then((brandId, data) => {
+                                                console.log('Adding permissions..');
+                                                lambdaAddPermission(brandId).then((data) => {
+                                                    console.log('Creating record set..');
+                                                    createRecordSet(brandId, edgeDomain).then((data) => {
+                                                        resolve(data);
+                                                    });
                                                 });
-                                            }
+                                            });
                                         });
-
-                                    }
+                                    });
                                 });
-                            } else {
 
+                                // Create new domain
+                                // var params = {
+                                //     domainName: brandId + '-api.wsuite.com',
+                                //     certificateArn: 'arn:aws:acm:us-east-1:133013689155:certificate/74991899-d4db-40ea-a32d-fc8901abf083',
+                                //     endpointConfiguration: {
+                                //         types: [
+                                //             'EDGE'
+                                //         ]
+                                //     }
+                                // };
+                                // apigateway.createDomainName(params, function (err, data) {
+                                //     if (err) {
+                                //         reject(err);
+                                //     }
+                                //     else {
+                                //         var edgeDomain = data.distributionDomainName;
+                                //         var params = {
+                                //             domainName: brandId + '-api.wsuite.com',
+                                //             restApiId: '6qegl7yi77',
+                                //             basePath: '',
+                                //             stage: 'production'
+                                //         };
+                                //         apigateway.createBasePathMapping(params, function (err, data) {
+                                //             if (err) {
+                                //                 console.log(err)
+                                //                 reject(err);
+                                //             } else {
+                                //                 console.log('Creating DNS Record..');
+                                //                 var params = {
+                                //                     ChangeBatch: {
+                                //                         Changes: [
+                                //                             {
+                                //                                 Action: "CREATE",
+                                //                                 ResourceRecordSet: {
+                                //                                     Name: brandId + '-api.wsuite.com',
+                                //                                     ResourceRecords: [
+                                //                                         {
+                                //                                             Value: edgeDomain
+                                //                                         }
+                                //                                     ],
+                                //                                     TTL: 60,
+                                //                                     Type: "CNAME"
+                                //                                 }
+                                //                             }
+                                //                         ]
+                                //                     },
+                                //                     HostedZoneId: "ZLUNFBW7I9KIX"
+                                //                 };
+                                //                 route53.changeResourceRecordSets(params, function (err, data) {
+                                //                     if (err) {
+                                //                         reject(err);
+                                //                     } else {
+                                //                         console.log(data);
+                                //                     }
+                                //                 });
+                                //             }
+                                //         });
+
+                                //     }
+                                // });
                             }
                         } else {
                             console.log('Domain already exist.');
@@ -347,5 +368,152 @@ var s3storage = {
     }
 
 };
+
+var createBrandLambdFunction = function (brandId) {
+    return when.promise(function (resolve, reject) {
+        var params = {
+            Code: { /* required */
+                S3Bucket: 'static.wsuite.com',
+                S3Key: 'wsuite-api-handler.zip'
+            },
+            FunctionName: 'wsuite-api-handler-' + brandId,
+            Handler: 'lambda.handler',
+            Role: 'arn:aws:iam::133013689155:role/lambda_basic_execution',
+            Runtime: 'nodejs6.10',
+            Description: 'lambda function for brand ' + brandId,
+            Environment: {
+                Variables: {
+                    'BRAND_ID': brandId,
+                    'S3_BUCKET': 'wsuite-alb',
+                    'Name': 'wsuite-api-handler-' + brandId
+                }
+            },
+            MemorySize: 128,
+            Timeout: 900
+        };
+        lambda.createFunction(params, function (err, data) {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve(data);
+            }
+        });
+    });
+};
+
+var createStage = function (brandId) {
+    return when.promise(function (resolve, reject) {
+        var params = {
+            deploymentId: 'p5ytaj',
+            restApiId: '6qegl7yi77',
+            stageName: brandId,
+            variables: {
+                'BRAND_ID': brandId
+            }
+        };
+        apigateway.createStage(params, function (err, data) {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve(data);
+            }
+        });
+    });
+}
+
+var lambdaAddPermission = function (brandId) {
+    return when.promise(function (resolve, reject) {
+        var params = {
+            Action: "lambda:InvokeFunction",
+            FunctionName: "arn:aws:lambda:us-east-1:133013689155:function:wsuite-api-handler-"+brandId,
+            Principal: "apigateway.amazonaws.com",
+            SourceArn: "arn:aws:execute-api:us-east-1:133013689155:6qegl7yi77/*/*/*",
+            StatementId: uuidv1()
+        };
+        lambda.addPermission(params, function (err, data) {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve(data);
+            }
+        });
+    });
+}
+
+var createDomain = function (brandId) {
+    return when.promise(function (resolve, reject) {
+        var params = {
+            domainName: brandId + '-api.wsuite.com',
+            certificateArn: 'arn:aws:acm:us-east-1:133013689155:certificate/74991899-d4db-40ea-a32d-fc8901abf083',
+            endpointConfiguration: {
+                types: [
+                    'EDGE'
+                ]
+            }
+        };
+        apigateway.createDomainName(params, function (err, data) {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve(data);
+            }
+        });
+    });
+}
+
+var createBasePathMapping = function (brandId) {
+    return when.promise(function (resolve, reject) {
+        var params = {
+            domainName: brandId + '-api.wsuite.com',
+            restApiId: '6qegl7yi77',
+            basePath: '',
+            stage: brandId
+        };
+        apigateway.createBasePathMapping(params, function (err, data) {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve(brandId, data);
+            }
+        });
+    });
+}
+
+var createRecordSet = function (brandId, edgeDomain) {
+    return when.promise(function (resolve, reject) {
+        var params = {
+            ChangeBatch: {
+                Changes: [
+                    {
+                        Action: "CREATE",
+                        ResourceRecordSet: {
+                            Name: brandId + '-api.wsuite.com',
+                            ResourceRecords: [
+                                {
+                                    Value: edgeDomain
+                                }
+                            ],
+                            TTL: 60,
+                            Type: "CNAME"
+                        }
+                    }
+                ]
+            },
+            HostedZoneId: "ZLUNFBW7I9KIX"
+        };
+        route53.changeResourceRecordSets(params, function (err, data) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(data);
+            }
+        });
+    });
+}
 
 module.exports = s3storage;

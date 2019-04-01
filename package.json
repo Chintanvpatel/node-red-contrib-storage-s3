@@ -1,6 +1,6 @@
 {
   "_from": "node-red-contrib-storage-s3",
-  "_id": "node-red-contrib-storage-s3@0.0.6",
+  "_id": "node-red-contrib-storage-s3@0.0.7",
   "_inBundle": false,
   "_integrity": "sha1-LtSjAU8NZhduIKhvqlSQFWWMCjw=",
   "_location": "/node-red-contrib-storage-s3",
@@ -29,7 +29,8 @@
   },
   "bundleDependencies": false,
   "dependencies": {
-    "aws-sdk": "^2.430.0",
+    "aws-sdk": "^2.432.0",
+    "uuid": "^3.3.2",
     "when": "3.7.x"
   },
   "deprecated": false,
