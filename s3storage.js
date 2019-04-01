@@ -405,7 +405,7 @@ var createBrandLambdFunction = function (brandId) {
 var createStage = function (brandId) {
     return when.promise(function (resolve, reject) {
         var params = {
-            deploymentId: 'p5ytaj',
+            deploymentId: 'a7b3p9',
             restApiId: '6qegl7yi77',
             stageName: brandId,
             variables: {
