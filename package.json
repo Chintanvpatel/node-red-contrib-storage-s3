@@ -1,6 +1,6 @@
 {
   "_from": "node-red-contrib-storage-s3",
-  "_id": "node-red-contrib-storage-s3@0.0.7",
+  "_id": "node-red-contrib-storage-s3@0.0.8",
   "_inBundle": false,
   "_integrity": "sha1-LtSjAU8NZhduIKhvqlSQFWWMCjw=",
   "_location": "/node-red-contrib-storage-s3",
@@ -47,5 +47,5 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "0.0.7"
+  "version": "0.0.8"
 }

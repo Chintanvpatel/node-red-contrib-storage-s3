@@ -176,96 +176,96 @@ var s3storage = {
                     reject(err.toString());
                 } else {
                     // Check If domain exist or not
-                    apigateway.getDomainName({ domainName: brandId + '-api.wsuite.com' }, function (err, domainData) {
-                        if (err) {
-                            if (err.code == 'NotFoundException') {
-                                // Creating lambda function for Brand
-                                createBrandLambdFunction(brandId).then((data) => {
-                                    // Creating new stage for brand
-                                    createStage(brandId).then((data) => {
-                                        console.log('Creating new domain..');
-                                        createDomain(brandId).then((domainData) => {
-                                            var edgeDomain = domainData.distributionDomainName;
-                                            console.log('Creating base path..');
-                                            createBasePathMapping(brandId).then((brandId, data) => {
-                                                console.log('Adding permissions..');
-                                                lambdaAddPermission(brandId).then((data) => {
-                                                    console.log('Creating record set..');
-                                                    createRecordSet(brandId, edgeDomain).then((data) => {
-                                                        resolve(data);
-                                                    });
-                                                });
-                                            });
-                                        });
-                                    });
-                                });
+                    // apigateway.getDomainName({ domainName: brandId + '-api.wsuite.com' }, function (err, domainData) {
+                    //     if (err) {
+                    //         if (err.code == 'NotFoundException') {
+                    //             // Creating lambda function for Brand
+                    //             createBrandLambdFunction(brandId).then((data) => {
+                    //                 // Creating new stage for brand
+                    //                 createStage(brandId).then((data) => {
+                    //                     console.log('Creating new domain..');
+                    //                     createDomain(brandId).then((domainData) => {
+                    //                         var edgeDomain = domainData.distributionDomainName;
+                    //                         console.log('Creating base path..');
+                    //                         createBasePathMapping(brandId).then((brandId, data) => {
+                    //                             console.log('Adding permissions..');
+                    //                             lambdaAddPermission(brandId).then((data) => {
+                    //                                 console.log('Creating record set..');
+                    //                                 createRecordSet(brandId, edgeDomain).then((data) => {
+                    //                                     resolve(data);
+                    //                                 });
+                    //                             });
+                    //                         });
+                    //                     });
+                    //                 });
+                    //             });
 
-                                // Create new domain
-                                // var params = {
-                                //     domainName: brandId + '-api.wsuite.com',
-                                //     certificateArn: 'arn:aws:acm:us-east-1:133013689155:certificate/74991899-d4db-40ea-a32d-fc8901abf083',
-                                //     endpointConfiguration: {
-                                //         types: [
-                                //             'EDGE'
-                                //         ]
-                                //     }
-                                // };
-                                // apigateway.createDomainName(params, function (err, data) {
-                                //     if (err) {
-                                //         reject(err);
-                                //     }
-                                //     else {
-                                //         var edgeDomain = data.distributionDomainName;
-                                //         var params = {
-                                //             domainName: brandId + '-api.wsuite.com',
-                                //             restApiId: '6qegl7yi77',
-                                //             basePath: '',
-                                //             stage: 'production'
-                                //         };
-                                //         apigateway.createBasePathMapping(params, function (err, data) {
-                                //             if (err) {
-                                //                 console.log(err)
-                                //                 reject(err);
-                                //             } else {
-                                //                 console.log('Creating DNS Record..');
-                                //                 var params = {
-                                //                     ChangeBatch: {
-                                //                         Changes: [
-                                //                             {
-                                //                                 Action: "CREATE",
-                                //                                 ResourceRecordSet: {
-                                //                                     Name: brandId + '-api.wsuite.com',
-                                //                                     ResourceRecords: [
-                                //                                         {
-                                //                                             Value: edgeDomain
-                                //                                         }
-                                //                                     ],
-                                //                                     TTL: 60,
-                                //                                     Type: "CNAME"
-                                //                                 }
-                                //                             }
-                                //                         ]
-                                //                     },
-                                //                     HostedZoneId: "ZLUNFBW7I9KIX"
-                                //                 };
-                                //                 route53.changeResourceRecordSets(params, function (err, data) {
-                                //                     if (err) {
-                                //                         reject(err);
-                                //                     } else {
-                                //                         console.log(data);
-                                //                     }
-                                //                 });
-                                //             }
-                                //         });
+                    //             // Create new domain
+                    //             // var params = {
+                    //             //     domainName: brandId + '-api.wsuite.com',
+                    //             //     certificateArn: 'arn:aws:acm:us-east-1:133013689155:certificate/74991899-d4db-40ea-a32d-fc8901abf083',
+                    //             //     endpointConfiguration: {
+                    //             //         types: [
+                    //             //             'EDGE'
+                    //             //         ]
+                    //             //     }
+                    //             // };
+                    //             // apigateway.createDomainName(params, function (err, data) {
+                    //             //     if (err) {
+                    //             //         reject(err);
+                    //             //     }
+                    //             //     else {
+                    //             //         var edgeDomain = data.distributionDomainName;
+                    //             //         var params = {
+                    //             //             domainName: brandId + '-api.wsuite.com',
+                    //             //             restApiId: '6qegl7yi77',
+                    //             //             basePath: '',
+                    //             //             stage: 'production'
+                    //             //         };
+                    //             //         apigateway.createBasePathMapping(params, function (err, data) {
+                    //             //             if (err) {
+                    //             //                 console.log(err)
+                    //             //                 reject(err);
+                    //             //             } else {
+                    //             //                 console.log('Creating DNS Record..');
+                    //             //                 var params = {
+                    //             //                     ChangeBatch: {
+                    //             //                         Changes: [
+                    //             //                             {
+                    //             //                                 Action: "CREATE",
+                    //             //                                 ResourceRecordSet: {
+                    //             //                                     Name: brandId + '-api.wsuite.com',
+                    //             //                                     ResourceRecords: [
+                    //             //                                         {
+                    //             //                                             Value: edgeDomain
+                    //             //                                         }
+                    //             //                                     ],
+                    //             //                                     TTL: 60,
+                    //             //                                     Type: "CNAME"
+                    //             //                                 }
+                    //             //                             }
+                    //             //                         ]
+                    //             //                     },
+                    //             //                     HostedZoneId: "ZLUNFBW7I9KIX"
+                    //             //                 };
+                    //             //                 route53.changeResourceRecordSets(params, function (err, data) {
+                    //             //                     if (err) {
+                    //             //                         reject(err);
+                    //             //                     } else {
+                    //             //                         console.log(data);
+                    //             //                     }
+                    //             //                 });
+                    //             //             }
+                    //             //         });
 
-                                //     }
-                                // });
-                            }
-                        } else {
-                            console.log('Domain already exist.');
-                            resolve();
-                        }
-                    });
+                    //             //     }
+                    //             // });
+                    //         }
+                    //     } else {
+                    //         console.log('Domain already exist.');
+                    //         resolve();
+                    //     }
+                    // });
                     resolve();
                 }
             });
